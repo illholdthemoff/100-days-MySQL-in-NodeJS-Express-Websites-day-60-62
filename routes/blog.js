@@ -40,4 +40,67 @@ router.post("/posts", async function (req, res) {
   res.redirect("/posts");
 }); // listening for things to appear on localhostetc/posts
 
+router.get("/posts/:id", async function (req, res) {
+  // dynamic route with route parameters, since we are loading a page via a dynamic link
+  const query = `
+    SELECT posts.*, authors.name AS author_name, authors.email AS author_email FROM posts 
+    INNER JOIN authors ON posts.author_id = authors.id
+    WHERE posts.id = ?
+  `;
+
+  const [posts] = await db.query(query, [req.params.id]); // replaces the ? with the selected id which is grabbed from the URL
+
+  if (!posts || posts.length === 0) {
+    return res.status(404).render("404"); //returns 404 page if an invalid post is added on the URL, or if there's no posts.
+  }
+
+  const postData = {
+    ...posts[0], //spreads out values from array into this object
+    date: posts[0].date.toISOString(), //changes the date object into a string so the datetime attribute in post-detail can use it.
+    humanReadableDate: posts[0].date.toLocaleDateString("en-US", {
+      // turns the date into a human readable object, with additional parameters as to what we want the localization to be and the format of the date output
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
+  };
+
+  res.render("post-detail", { post: postData });
+});
+
+router.get("/posts/:id/edit", async function (req, res) {
+  const query = `
+  SELECT * FROM posts WHERE id = ?
+  `;
+  const [posts] = await db.query(query, [req.params.id]);
+
+  if (!posts || posts.length === 0) {
+    return res.status(404).render("404");
+  }
+
+  res.render("update-post", { post: posts[0] });
+});
+
+router.post("/posts/:id/edit", async function (req, res) {
+  const query = `
+  UPDATE posts SET title = ?, summary = ?, body = ?
+  WHERE id = ?
+`;
+
+  await db.query(query, [
+    req.body.title,
+    req.body.summary,
+    req.body.content, // body.title, .summary etc because these are the NAMES of the items in the update-post ejs
+    req.params.id,
+  ]);
+
+  res.redirect("/posts");
+});
+
+router.post("/posts/:id/delete", async function (req, res) {
+  await db.query(" DELETE FROM posts WHERE id = ?", [req.params.id]); // puts the value inside the [], in this case the id, where the ? is when the code is executed
+  res.redirect("/posts");
+});
+
 module.exports = router;
